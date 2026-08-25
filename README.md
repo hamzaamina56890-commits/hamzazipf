@@ -1,106 +1,23 @@
-# Chinese-boot
+# Chinese-boot Android Companion
 
-Independent real-time market scanner. Olymp Trade remains outside the scanner's
-data path and is never controlled automatically.
+This companion is a permission-aware overlay shell for the scanner website. It does not automate Olymp Trade, inspect platform UI, click DOM elements, use private endpoints, or handle credentials.
 
-## Timeframes
-- 1 minute
-- 5 minutes
-- 15 minutes
-- 30 minutes
-- 1 hour
+## Build
 
-## Initial Forex Assets
-- EUR/USD
-- GBP/USD
-- USD/JPY
-- AUD/USD
-- USD/CAD
-- NZD/USD
-- GBP/JPY
-
-## Project Goal
-Real-time market scanning, candle analysis and UP/DOWN signals based on verified market data.
-
-## Important
-The project must not generate fake market data or fake signals.
-
-## Setup
-
-1. Create a virtual environment and install dependencies:
-
-	```bash
-	python -m venv .venv
-	. .venv/bin/activate
-	pip install -r requirements.txt
-	```
-
-2. The scanner uses Yahoo Finance as an independent public fallback. If a
-	Twelve Data credential is configured, Twelve Data is tried first and Yahoo
-	Finance is tried after provider errors, rate limits, malformed data, or stale
-	candles. Set the credential in the environment; never commit it:
-
-	```bash
-	export TWELVE_DATA_API_KEY=your_key
-	```
-
-	An alternate API base URL can be supplied with `TWELVE_DATA_BASE_URL` for
-	testing or an approved deployment. For a separately hosted frontend,
-	provide its comma-separated origins with `FRONTEND_ORIGINS`.
-
-3. Start the application:
-
-	```bash
-	uvicorn backend.app:app --reload
-	```
-
-### Render deployment
-
-The repository includes `render.yaml` for a Render web service. Connect this
-GitHub repository in the Render dashboard and use the blueprint configuration.
-Render supplies the public HTTPS URL and `PORT` automatically. The production
-start command is:
+Open this directory in Android Studio with an Android SDK installed. The app targets Android 8.0+ and uses a foreground service only after the user explicitly enables the overlay. Configure a stable, deployed backend before syncing or building:
 
 ```bash
-uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+export SCANNER_BACKEND_URL=https://scanner.example.com
+gradle :app:assembleRelease
 ```
 
-Set `TWELVE_DATA_API_KEY` as a Render secret when Twelve Data access is
-available. `TWELVE_DATA_BASE_URL` and `FRONTEND_ORIGINS` are service settings;
-the latter should contain the deployed frontend origin when hosted separately.
-Never commit these values or put them in the Android APK.
+`-PscannerBackendUrl=https://scanner.example.com` can be used instead of the environment variable. The build intentionally fails when neither value is supplied; a Codespaces URL must not be embedded as a production default.
 
-Open `http://127.0.0.1:8000/`. The dashboard uses the same origin by default;
-set `window.API_BASE` before the frontend script when hosting it separately.
+## Behavior
 
-## API
-
-- `GET /api/health` reports application and provider configuration status.
-- `GET /api/assets` returns the documented assets and timeframes.
-- `GET /api/quote?symbol=EUR/USD` returns a quote from the configured provider
-	with provider and verification metadata.
-- `GET /api/candles?symbol=EUR/USD&timeframe_seconds=60&limit=100` returns
-  validated OHLC candles.
-- The equivalent `timeframe=1min&seconds=60` form is also accepted; the two
-	values must agree.
-- `POST /api/analyze` analyzes a supplied set of verified candles.
-
-Missing credentials, stale/malformed responses, provider failures, and source
-mismatches never create replacement prices, candles, or signals. All candles
-are normalized to UTC and must be closed and fresh. The scanner uses the next
-higher timeframe as confirmation and returns `WAIT` on a conflict.
-
-## Scanner safety
-
-The floating web scanner is Manual-only while Olymp Trade live data and
-authorized execution are unavailable. It exposes `/api/scanner/scan`,
-`/api/scanner/start`, `/api/scanner/stop`, `/api/scanner/emergency-stop`,
-`/api/scanner/status`, and `/api/scanner/live`. Every unavailable scan returns
-`WAIT` with no price. Auto mode is rejected until Olymp Trade supplies an
-authorized trading API or partner integration.
-
-`android-companion/` contains the Android overlay companion source. It asks the
-user for explicit Display over other apps permission and runs a visible
-foreground service with a draggable bubble. An Android SDK is required to build
-the APK; no APK is produced in this repository environment.
-
+- Requests `SYSTEM_ALERT_WINDOW` through the Android settings screen.
+- Shows a draggable scanner bubble after explicit enablement.
+- Tapping the bubble opens a manual scanner panel with asset, timeframe, verified-data status, signal, confidence, mode, start, stop, and emergency-stop controls.
+- The panel reports `WAIT` when no verified market source is available; it never invents prices or signals.
+- The overlay can be disabled from the app and is removed when the service stops.
+- AUTO execution remains unavailable until an official authorized Olymp Trade trading integration exists.
